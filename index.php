@@ -13,7 +13,6 @@
     $data = DB::query($_POST['query']);
 
   $indices = DB::query('SHOW TABLES');
-  $data = DB::query('SELECT * FROM rtvideo LIMIT 10');
 
   /**
    * Query class
@@ -27,17 +26,19 @@
       self::$connection = new \MySQLi($host, null, null, null, $port, null);
     }
 
-    public static function query($q)
+    public static function query($q, $debug = false)
     {
-      $data = self::$connection->query($q);
+      if ( !$data = self::$connection->query($q)) return false;
       
-      if ($data)
-      {
-        $data = $data->fetch_all(MYSQLI_ASSOC);
-        array_walk($data, function(&$v){$v = (object)$v; });
-      }
+      $data = $data->fetch_all(MYSQLI_ASSOC);
+      array_walk($data, function(&$v){$v = (object)$v; });
 
-      return $data ?: false;
+      return $data;
+    }
+
+    public static function getFields($index)
+    {
+      return DB::query("DESCRIBE $index");
     }
 
   }
@@ -50,12 +51,6 @@
     <meta charset="utf-8">
     <title>Sphinx Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-    <!--[if lt IE 9]>
-      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
-    <![endif]-->
-
     <style type="text/css">
       
       body {
@@ -92,14 +87,36 @@
       <div class="row">
 
         <div class="col-lg-2 sidebar">
-          <h6>Indexes</h6>
-          <?php if ($indices):?>
-            <ul class="nav nav-sidebar">
-              <?php foreach ($indices as $i): ?>
-                <li><a href="#"><?php echo $i->Index?> (<?=$i->Type?>)</a></li>
+            <h6 class="sub-header">Indexes</h6>
+            <?php if ($indices): ?>
+              <?php foreach ($indices as $in): ?>
+
+                <div class="panel-group" id="accordion">
+                  <div class="panel panel-default">
+                    <div class="panel-heading">
+                      <h4 class="panel-title">
+                        <a data-toggle="collapse" data-parent="#accordion" href="#collapse<?=$in->Index; ?>">
+                          <?=$in->Index; ?> (<?=$in->Type?>)
+                        </a>
+                      </h4>
+                    </div>
+                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse in">
+                      <div class="panel-body">
+                        <table>
+                          <?php foreach (DB::getFields($in->Index) as $f): ?>
+                            <tr>
+                              <td><small><code><?=$f->Field?>: <?=$f->Type?></code></small></td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               <?php endforeach; ?>
-            </ul>
-          <?php endif; ?>
+            <?php endif; ?>
+
         </div>
 
         <div class="col-lg-10 main">
@@ -107,14 +124,13 @@
             
             <div class="col-lg-12 main">
               <h6 class="sub-header">Query</h6>
-                    
-              <form>
-              <div class="col-lg-10">
-                  <input  type="text" value="" class="form-control">
-              </div>
-              <div class="col-lg-2">
-                  <a href="#fakelink" class="btn btn-block btn-default btn-success">Go</a>
-              </div>
+              <form method="post" action="#" id="request">
+                <div class="col-lg-10">
+                    <input name="query" type="text" value="" class="form-control">
+                </div>
+                <div class="col-lg-2">
+                    <a href="#" class="btn btn-block btn-default btn-success request" onclick="dbRequest();">Go</a>
+                </div>
               </form>  
             </div>
 
@@ -122,11 +138,11 @@
 
             <h6 class="sub-header">Rows</h6>
             <div class="tile">
-              Total rows found: <?php echo isset($data) ? count($data) : 0;?>
+              Total rows found: <?php echo (isset($data) and $data) ? count($data) : 0;?>
             </div>
 
             <div class="table-responsive">
-            <?php if ($data): ?>
+            <?php if (isset($data) and $data): ?>
               <table class="table table-striped">
                 <thead>
                   <tr>
@@ -159,13 +175,16 @@
     <!-- ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
     <!-- Latest compiled and minified CSS -->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://raw.githubusercontent.com/designmodo/Flat-UI/master/css/flat-ui.css">
-
+    <script type="text/javascript">
+      function dbRequest() {
+        document.getElementById("request").submit();
+      }
+    </script>
     <!-- Optional theme -->
-    <!-- <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css"> -->
-
     <!-- Latest compiled and minified JavaScript -->
-    <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
   </body>
   </html>
