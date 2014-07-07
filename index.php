@@ -9,7 +9,7 @@
    */
   new DB($host, $port);
 
-  if (isset($_POST['query']))
+  if (isset($_POST['query']) and $_POST['query'])
     $data = DB::query($_POST['query']);
 
   $indices = DB::query('SHOW TABLES');
@@ -28,21 +28,28 @@
 
     public static function query($q, $debug = false)
     {
-      if ( !$data = self::$connection->query($q)) return false;
+      $data = [];
+
+      if ( ! $result = self::$connection->query($q))
+        return false;
       
-      $data = $data->fetch_all(MYSQLI_ASSOC);
-      array_walk($data, function(&$v){$v = (object)$v; });
+      while ($row = $result->fetch_assoc()) 
+        $data[] = (object)$row;
 
       return $data;
     }
 
+    /**
+     * Describe index
+     * @param  string $index 
+     * @return 
+     */
     public static function getFields($index)
     {
       return DB::query("DESCRIBE $index");
     }
 
   }
-
 
 ?>
 <!-- Template view -->
@@ -61,6 +68,7 @@
   </head>
   <body>
 
+  <!-- Navigation bar -->
     <div class="navbar navbar-default navbar-fixed-top" role="navigation">
         <div class="container-fluid">
           <div class="navbar-header">
@@ -88,6 +96,8 @@
 
         <div class="col-lg-2 sidebar">
             <h6 class="sub-header">Indexes</h6>
+            
+            <!-- Indexes list -->
             <?php if ($indices): ?>
               <?php foreach ($indices as $in): ?>
 
@@ -100,7 +110,7 @@
                         </a>
                       </h4>
                     </div>
-                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse in">
+                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse">
                       <div class="panel-body">
                         <table>
                           <?php foreach (DB::getFields($in->Index) as $f): ?>
@@ -122,6 +132,7 @@
         <div class="col-lg-10 main">
           <div class="row">
             
+            <!-- Query form -->
             <div class="col-lg-12 main">
               <h6 class="sub-header">Query</h6>
               <form method="post" action="#" id="request">
@@ -141,6 +152,7 @@
               Total rows found: <?php echo (isset($data) and $data) ? count($data) : 0;?>
             </div>
 
+            <!-- Results -->
             <div class="table-responsive">
             <?php if (isset($data) and $data): ?>
               <table class="table table-striped">
@@ -179,12 +191,12 @@
     <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://raw.githubusercontent.com/designmodo/Flat-UI/master/css/flat-ui.css">
+    
     <script type="text/javascript">
       function dbRequest() {
         document.getElementById("request").submit();
       }
     </script>
-    <!-- Optional theme -->
-    <!-- Latest compiled and minified JavaScript -->
+    
   </body>
   </html>
