@@ -1,6 +1,13 @@
 <?php
+  /**
+   * There is nothing special, but I was missing it
+   * @author  Roman Negrulenko lifekent@gmail.com
+   * @link    lifekent.com
+   */
 
-  // Connection settings
+  /**
+   * Connection settings
+   */
   $host = '127.0.0.1';
   $port = 9306;
   
@@ -8,11 +15,6 @@
    * Bootstrapping and quering
    */
   new DB($host, $port);
-
-  if (isset($_POST['query']))
-    $data = DB::query($_POST['query']);
-
-  $indices = DB::query('SHOW TABLES');
 
   /**
    * Query class
@@ -23,10 +25,12 @@
 
     public function __construct($host = '127.0.0.1', $port = 9306)
     {
-      self::$connection = new \MySQLi($host, null, null, null, $port, null);
+      self::$connection = @new \MySQLi($host, null, null, null, $port, null);
+      if (self::$connection->connect_error) 
+        die("There was a problem with a connection: " . self::$connection->connect_error);
     }
 
-    public static function query($q, $debug = false)
+    public static function query($q)
     {
       if ( !$data = self::$connection->query($q)) return false;
       
@@ -36,20 +40,25 @@
       return $data;
     }
 
-    public static function getFields($index)
-    {
-      return DB::query("DESCRIBE $index");
-    }
-
   }
 
+  // Processing
+  if (!empty($_POST['query']))
+  {
+    $metadata = new stdClass;
+    $data = DB::query($_POST['query']);
+    $meta = DB::$connection->query('SHOW META')->fetch_all();
+    array_walk($meta, function($a) use (&$metadata){ $metadata->$a[0] = $a[1];});
+  } 
+
+  $indices = DB::query('SHOW TABLES');
 
 ?>
 <!-- Template view -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Sphinx Viewer</title>
+    <title>SphinxViewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style type="text/css">
       
@@ -70,14 +79,12 @@
               <span class="icon-bar"></span>
               <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="#">Sphinx viewer</a>
+            <a class="navbar-brand" href="#">SphinxViewer</a>
           </div>
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav navbar-right">
-              <li><a href="http://sphinxsearch.com/docs/">Documentation</a></li>
-              <li><a href="#">Help</a></li>
+              <li><a target="_blank" href="http://sphinxsearch.com/docs/">Documentation</a></li>
             </ul>
-
           </div>
         </div>
     </div>
@@ -85,12 +92,10 @@
     <div class="container-fluid">
       
       <div class="row">
-
         <div class="col-lg-2 sidebar">
             <h6 class="sub-header">Indexes</h6>
             <?php if ($indices): ?>
               <?php foreach ($indices as $in): ?>
-
                 <div class="panel-group" id="accordion">
                   <div class="panel panel-default">
                     <div class="panel-heading">
@@ -100,10 +105,10 @@
                         </a>
                       </h4>
                     </div>
-                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse in">
+                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse">
                       <div class="panel-body">
                         <table>
-                          <?php foreach (DB::getFields($in->Index) as $f): ?>
+                          <?php foreach (DB::query("DESCRIBE {$in->Index}") as $f): ?>
                             <tr>
                               <td><small><code><?=$f->Field?>: <?=$f->Type?></code></small></td>
                             </tr>
@@ -113,15 +118,12 @@
                     </div>
                   </div>
                 </div>
-
               <?php endforeach; ?>
             <?php endif; ?>
-
         </div>
 
         <div class="col-lg-10 main">
           <div class="row">
-            
             <div class="col-lg-12 main">
               <h6 class="sub-header">Query</h6>
               <form method="post" action="#" id="request">
@@ -133,12 +135,19 @@
                 </div>
               </form>  
             </div>
-
           </div>
 
             <h6 class="sub-header">Rows</h6>
             <div class="tile">
-              Total rows found: <?php echo (isset($data) and $data) ? count($data) : 0;?>
+              <?php if (!empty($data) and !empty($meta)): ?>
+                <small>
+                  Total rows returned: <?=count($data);?><br/>
+                  Total rows found: <?=$metadata->total_found;?><br/>
+                  Time taken: <?=$metadata->time;?>
+                </small>
+              <?php else: ?>
+                <small>Nothing found or there was an error in the query</small>
+              <?php endif; ?>
             </div>
 
             <div class="table-responsive">
@@ -168,13 +177,17 @@
           </div>
         </div>
       </div>
-
     </div>
 
-    <!-- Bootstrap core JavaScript -->
-    <!-- ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <!-- Latest compiled and minified CSS -->
+    <div class="row">
+      <div class="col-xs-12 text-center">
+        <span>
+          Licensed under <a href="http://www.dbad-license.org/" target="_blank">DBAD</a> license! 
+        </span>
+      </div> 
+    </div>
+
+    <!-- Bootstrap -->
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
@@ -184,7 +197,5 @@
         document.getElementById("request").submit();
       }
     </script>
-    <!-- Optional theme -->
-    <!-- Latest compiled and minified JavaScript -->
   </body>
   </html>
