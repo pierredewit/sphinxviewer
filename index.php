@@ -1,20 +1,65 @@
 <?php
-  $conn = new \MySQLi('127.0.0.1', null, null, null, 9306, null);
-  $res = $conn->query("select * from rtvideo limit 20");
-  var_dump($res->fetch_assoc());die;
+  /**
+   * There is nothing special, but I was missing it
+   * @author  Roman Negrulenko lifekent@gmail.com
+   * @link    lifekent.com
+   */
+
+  /**
+   * Connection settings
+   */
+  $host = '127.0.0.1';
+  $port = 9306;
+  
+  /**
+   * Bootstrapping and quering
+   */
+  new DB($host, $port);
+
+  /**
+   * Query class
+   */
+  class DB
+  {
+    public static $connection;
+
+    public function __construct($host = '127.0.0.1', $port = 9306)
+    {
+      self::$connection = @new \MySQLi($host, null, null, null, $port, null);
+      if (self::$connection->connect_error) 
+        die("There was a problem with a connection: " . self::$connection->connect_error);
+    }
+
+    public static function query($q)
+    {
+      if ( !$data = self::$connection->query($q)) return false;
+      
+      $data = $data->fetch_all(MYSQLI_ASSOC);
+      array_walk($data, function(&$v){$v = (object)$v; });
+
+      return $data;
+    }
+
+  }
+
+  // Processing
+  if (!empty($_POST['query']))
+  {
+    $metadata = new stdClass;
+    $data = DB::query($_POST['query']);
+    $meta = DB::$connection->query('SHOW META')->fetch_all();
+    array_walk($meta, function($a) use (&$metadata){ $metadata->$a[0] = $a[1];});
+  } 
+
+  $indices = DB::query('SHOW TABLES');
+
 ?>
 <!-- Template view -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Sphinx Viewer</title>
+    <title>SphinxViewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-    <!--[if lt IE 9]>
-      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
-      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
-    <![endif]-->
-
     <style type="text/css">
       
       body {
@@ -34,18 +79,12 @@
               <span class="icon-bar"></span>
               <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="#">Sphinx viewer</a>
+            <a class="navbar-brand" href="#">SphinxViewer</a>
           </div>
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav navbar-right">
-              <li><a href="#">Dashboard</a></li>
-              <li><a href="#">Settings</a></li>
-              <li><a href="#">Profile</a></li>
-              <li><a href="#">Help</a></li>
+              <li><a target="_blank" href="http://sphinxsearch.com/docs/">Documentation</a></li>
             </ul>
-            <form class="navbar-form navbar-right">
-              <input type="text" class="form-control" placeholder="Search...">
-            </form>
           </div>
         </div>
     </div>
@@ -53,79 +92,110 @@
     <div class="container-fluid">
       
       <div class="row">
-
         <div class="col-lg-2 sidebar">
-          <ul class="nav nav-sidebar">
-            <li class="active"><a href="#">Overview</a></li>
-            <li><a href="#">Reports</a></li>
-            <li><a href="#">Analytics</a></li>
-            <li><a href="#">Export</a></li>
-          </ul>
-          <ul class="nav nav-sidebar">
-            <li><a href="">Nav item</a></li>
-            <li><a href="">Nav item again</a></li>
-            <li><a href="">One more nav</a></li>
-            <li><a href="">Another nav item</a></li>
-            <li><a href="">More navigation</a></li>
-          </ul>
-          <ul class="nav nav-sidebar">
-            <li><a href="">Nav item again</a></li>
-            <li><a href="">One more nav</a></li>
-            <li><a href="">Another nav item</a></li>
-          </ul>
+            <h6 class="sub-header">Indexes</h6>
+            <?php if ($indices): ?>
+              <?php foreach ($indices as $in): ?>
+                <div class="panel-group" id="accordion">
+                  <div class="panel panel-default">
+                    <div class="panel-heading">
+                      <h4 class="panel-title">
+                        <a data-toggle="collapse" data-parent="#accordion" href="#collapse<?=$in->Index; ?>">
+                          <?=$in->Index; ?> (<?=$in->Type?>)
+                        </a>
+                      </h4>
+                    </div>
+                    <div id="collapse<?=$in->Index; ?>" class="panel-collapse collapse">
+                      <div class="panel-body">
+                        <table>
+                          <?php foreach (DB::query("DESCRIBE {$in->Index}") as $f): ?>
+                            <tr>
+                              <td><small><code><?=$f->Field?>: <?=$f->Type?></code></small></td>
+                            </tr>
+                          <?php endforeach; ?>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            <?php endif; ?>
         </div>
 
         <div class="col-lg-10 main">
-          <h1 class="page-header">Dashboard</h1>
-
-          <div class="row placeholders">
-            <div class="col-xs-6 col-sm-3 placeholder">
-              <ol class="breadcrumb">
-                <li><a href="#">Home</a></li>
-                <li><a href="#">Library</a></li>
-                <li class="active">Data</li>
-              </ol>
+          <div class="row">
+            <div class="col-lg-12 main">
+              <h6 class="sub-header">Query</h6>
+              <form method="post" action="#" id="request">
+                <div class="col-lg-10">
+                    <input name="query" type="text" value="" class="form-control">
+                </div>
+                <div class="col-lg-2">
+                    <a href="#" class="btn btn-block btn-default btn-success request" onclick="dbRequest();">Go</a>
+                </div>
+              </form>  
             </div>
           </div>
 
-          <h2 class="sub-header">Section title</h2>
-          <div class="table-responsive">
-            <table class="table table-striped">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Header</th>
-                  <th>Header</th>
-                  <th>Header</th>
-                  <th>Header</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>1,015</td>
-                  <td>sodales</td>
-                  <td>ligula</td>
-                  <td>in</td>
-                  <td>libero</td>
-                </tr>
-              </tbody>
-            </table>
+            <h6 class="sub-header">Rows</h6>
+            <div class="tile">
+              <?php if (!empty($data) and !empty($meta)): ?>
+                <small>
+                  Total rows returned: <?=count($data);?><br/>
+                  Total rows found: <?=$metadata->total_found;?><br/>
+                  Time taken: <?=$metadata->time;?>
+                </small>
+              <?php else: ?>
+                <small>Nothing found or there was an error in the query</small>
+              <?php endif; ?>
+            </div>
+
+            <div class="table-responsive">
+            <?php if (isset($data) and $data): ?>
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <?php $fields = reset($data); ?>
+                    <?php foreach ($fields as $n => $f): ?>
+                      <th><?=$n?></th>
+                    <?php endforeach; ?>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php $c = 1; foreach ($data as $value): ?>
+                     <tr>
+                      <td><?=$c++?></td>
+                      <?php foreach ($value as $k => $v): ?>
+                        <td><?=$v?></td>
+                      <?php endforeach; ?>
+                    </tr> 
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            <?php endif; ?>
           </div>
         </div>
       </div>
-
     </div>
 
-    <!-- Bootstrap core JavaScript
-    ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <div class="row">
+      <div class="col-xs-12 text-center">
+        <span>
+          Licensed under <a href="http://www.dbad-license.org/" target="_blank">DBAD</a> license! 
+        </span>
+      </div> 
+    </div>
 
-    <!-- Optional theme -->
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
-
-    <!-- Latest compiled and minified JavaScript -->
+    <!-- Bootstrap -->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://raw.githubusercontent.com/designmodo/Flat-UI/master/css/flat-ui.css">
+    <script type="text/javascript">
+      function dbRequest() {
+        document.getElementById("request").submit();
+      }
+    </script>
   </body>
   </html>
