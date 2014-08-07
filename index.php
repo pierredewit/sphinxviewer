@@ -32,9 +32,12 @@
 
     public static function query($q)
     {
-      if ( !$data = self::$connection->query($q)) return false;
+      if ( !$result = self::$connection->query($q)) return false;
       
-      $data = $data->fetch_all(MYSQLI_ASSOC);
+      $data = array();
+      while($row = $result->fetch_assoc())
+          $data[] = $row;
+
       array_walk($data, function(&$v){$v = (object)$v; });
 
       return $data;
@@ -47,8 +50,15 @@
   {
     $metadata = new stdClass;
     $data = DB::query($_POST['query']);
-    $meta = DB::$connection->query('SHOW META')->fetch_all();
-    array_walk($meta, function($a) use (&$metadata){ $metadata->$a[0] = $a[1];});
+    $meta = (object)DB::$connection->query('SHOW META');
+
+    while($row = $meta->fetch_assoc())
+    {
+      $k = reset(array_values($row));
+      $v = end(array_values($row));
+      $metadata->$k = $v;
+    }
+   
   } 
 
   $indices = DB::query('SHOW TABLES');
@@ -142,8 +152,8 @@
               <?php if (!empty($data) and !empty($meta)): ?>
                 <small>
                   Total rows returned: <?=count($data);?><br/>
-                  Total rows found: <?=$metadata->total_found;?><br/>
-                  Time taken: <?=$metadata->time;?>
+                   Total rows found: <?=$metadata->total_found;?><br/>
+                  Time taken: <?=$metadata->time;?> 
                 </small>
               <?php else: ?>
                 <small>Nothing found or there was an error in the query</small>
